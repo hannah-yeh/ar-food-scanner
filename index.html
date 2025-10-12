@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AR 食品成分偵測</title>
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4"></script>
+</head>
+<body style='margin : 0px; overflow: hidden;'>
+
+    <a-scene embedded arjs>
+
+        <a-camera-static/>
+        
+        <a-entity id="feedback-entity" visible="false" position="0 0 -2">
+            <a-box color="#FF4500" scale="0.5 0.5 0.5" rotation="0 45 0"></a-box>
+            <a-text value="警告：檢測到不健康成分！" color="#FF4500" position="0 0.4 -0.5" align="center" width="2"></a-text>
+        </a-entity>
+
+    </a-scene>
+
+    <button id="scanButton" style="position:fixed; bottom:20px; left:50%; transform:translateX(-50%); z-index:99; padding:10px 20px;">
+        開始掃描成分
+    </button>
+
+    <script>
+        // 設定要偵測的「不健康」成分清單
+        const badIngredients = ["高果糖玉米糖漿", "反式脂肪", "鈉", "人造色素"];
+
+        // 監聽按鈕點擊事件
+        document.getElementById('scanButton').addEventListener('click', async () => {
+            console.log("正在掃描中...");
+            const feedbackEntity = document.getElementById('feedback-entity');
+            
+            // 隱藏回饋物件
+            feedbackEntity.setAttribute('visible', 'false');
+
+            // 獲取攝影機畫面作為影像
+            const video = document.querySelector('video');
+            if (!video) {
+                console.error("找不到攝影機畫面。");
+                return;
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // 使用 Tesseract.js 進行文字辨識
+            const { data: { text } } = await Tesseract.recognize(canvas, 'chi_tra');
+
+            // 將辨識結果轉換為小寫，方便比對
+            const recognizedText = text.toLowerCase();
+            console.log("辨識結果：", recognizedText);
+
+            // 檢查是否包含任何不健康的成分
+            let hasBadIngredient = false;
+            for (const ingredient of badIngredients) {
+                if (recognizedText.includes(ingredient.toLowerCase())) {
+                    hasBadIngredient = true;
+                    break;
+                }
+            }
+
+            // 根據偵測結果給予回饋
+            if (hasBadIngredient) {
+                console.log("檢測到不健康成分！");
+                feedbackEntity.setAttribute('visible', 'true');
+            } else {
+                alert("未檢測到清單中的不健康成分。");
+            }
+        });
+    </script>
+</body>
+</html>
