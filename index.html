@@ -25,52 +25,54 @@
     </button>
 
     <script>
-        // 設定要偵測的「不健康」成分清單
-        const badIngredients = ["高果糖玉米糖漿", "反式脂肪", "鈉", "人造色素"];
-
+        // 獲取畫面中的元素
+        const scanButton = document.getElementById('scanButton');
+        const scene = document.querySelector('a-scene');
+    
+        // 建立一個顯示文字的虛擬物件
+        const textEntity = document.createElement('a-entity');
+        textEntity.setAttribute('id', 'result-text');
+        textEntity.setAttribute('visible', 'false');
+        textEntity.setAttribute('position', '0 0 -2');
+        textEntity.setAttribute('text', {
+            value: '',
+            color: '#FFFFFF',
+            align: 'center',
+            width: 3
+        });
+        scene.appendChild(textEntity);
+    
         // 監聽按鈕點擊事件
-        document.getElementById('scanButton').addEventListener('click', async () => {
+        scanButton.addEventListener('click', async () => {
             console.log("正在掃描中...");
-            const feedbackEntity = document.getElementById('feedback-entity');
             
-            // 隱藏回饋物件
-            feedbackEntity.setAttribute('visible', 'false');
-
-            // 獲取攝影機畫面作為影像
+            // 隱藏之前的文字
+            textEntity.setAttribute('visible', 'false');
+    
+            // 獲取攝影機畫面
             const video = document.querySelector('video');
             if (!video) {
                 console.error("找不到攝影機畫面。");
                 return;
             }
-
+    
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             const context = canvas.getContext('2d');
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
+    
             // 使用 Tesseract.js 進行文字辨識
             const { data: { text } } = await Tesseract.recognize(canvas, 'chi_tra');
-
-            // 將辨識結果轉換為小寫，方便比對
-            const recognizedText = text.toLowerCase();
-            console.log("辨識結果：", recognizedText);
-
-            // 檢查是否包含任何不健康的成分
-            let hasBadIngredient = false;
-            for (const ingredient of badIngredients) {
-                if (recognizedText.includes(ingredient.toLowerCase())) {
-                    hasBadIngredient = true;
-                    break;
-                }
-            }
-
-            // 根據偵測結果給予回饋
-            if (hasBadIngredient) {
-                console.log("檢測到不健康成分！");
-                feedbackEntity.setAttribute('visible', 'true');
+    
+            console.log("辨識結果：", text);
+    
+            // 顯示辨識到的文字
+            if (text && text.trim().length > 0) {
+                textEntity.setAttribute('text', 'value', `偵測到文字：\n${text}`);
+                textEntity.setAttribute('visible', 'true');
             } else {
-                alert("未檢測到清單中的不健康成分。");
+                alert("未偵測到任何文字，請重新掃描。");
             }
         });
     </script>
