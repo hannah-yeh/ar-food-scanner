@@ -2,50 +2,157 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>進階 OCR -> Direct AR 測試 (v2)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tesseract.js 圖片上傳辨識測試</title>
     <style>
-        /* CSS 樣式部分完全沒變，此處省略以節省空間 */
-        :root { --primary-color: #007bff; --dark-color: #333; --light-color: #fff; } body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #f4f4f4; overflow: hidden; } .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.3s ease; } .hidden { display: none !important; } #test-card-screen { background-color: #e9ecef; } #test-card { background-color: var(--light-color); padding: 40px 60px; border-radius: 15px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); border: 1px solid #ddd; } #test-card h1 { font-size: 60px; font-weight: bold; font-family: 'Heiti TC', 'Microsoft JhengHei', sans-serif; color: var(--dark-color); margin: 0; } #instructions { margin-top: 30px; font-size: 16px; color: #666; text-align: center; max-width: 300px; } .main-button { padding: 15px 30px; font-size: 18px; cursor: pointer; border-radius: 50px; border: none; background-color: var(--primary-color); color: white; box-shadow: 0 4px 8px rgba(0,0,0,0.2); margin-top: 20px; } #camera-screen video { width: 100%; height: 100%; object-fit: cover; } #controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10; text-align: center; width: 90%; } #status { background: rgba(0,0,0,0.7); color: white; padding: 10px 20px; border-radius: 10px; margin-bottom: 15px; font-size: 14px; } model-viewer { position: absolute; top:0; left:0; width: 100%; height: 100%; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            background-color: #f0f2f5;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        h1 {
+            margin-top: 0;
+            color: #1a73e8;
+        }
+        #uploader {
+            display: none; /* 隱藏原始的 input */
+        }
+        .upload-label {
+            display: inline-block;
+            padding: 12px 25px;
+            background-color: #1a73e8;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .upload-label:hover {
+            background-color: #1558b8;
+        }
+        #image-preview {
+            max-width: 100%;
+            height: auto;
+            margin-top: 20px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            display: none; /* 預設不顯示 */
+        }
+        #status {
+            margin-top: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            min-height: 25px; /* 避免文字跳動 */
+        }
+        #result-box {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            text-align: left;
+            white-space: pre-wrap; /* 自動換行 */
+            word-wrap: break-word;
+            font-family: 'Courier New', Courier, monospace;
+            display: none; /* 預設不顯示 */
+        }
     </style>
     <script src='https://unpkg.com/tesseract.js@5/dist/tesseract.min.js'></script>
-    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
 </head>
 <body>
 
-    <div id="test-card-screen" class="screen">
-        <div id="test-card">
-            <h1>皮卡丘</h1>
+    <div class="container">
+        <h1>Tesseract.js 關鍵字辨識</h1>
+        <p>請上傳一張圖片，或用手機拍照，系統將辨識是否包含關鍵字「皮卡丘」。</p>
+        
+        <label for="uploader" class="upload-label">選擇檔案或拍照</label>
+        <input type="file" id="uploader" accept="image/*">
+
+        <div id="status">請選擇一張圖片</div>
+
+        <img id="image-preview" alt="您上傳的圖片預覽">
+
+        <div id="result-box">
+            <h3>完整辨識文字:</h3>
+            <pre id="result-text"></pre>
         </div>
-        <div id="instructions">
-            <p>請在另一台裝置 (手機/電腦) 打開此網頁，點擊下方按鈕以啟動相機，並掃描此卡片。</p>
-        </div>
-        <button id="start-camera-button" class="main-button">啟動相機進行掃描</button>
     </div>
 
-    <div id="camera-screen" class="screen hidden">
-        <video id="video" playsinline></video>
-        <div id="controls">
-            <div id="status">請將相機對準測試卡上的「皮卡丘」</div>
-            <button id="scan-button" class="main-button">掃描</button>
-        </div>
-    </div>
-    
-    <div id="ar-screen" class="screen hidden">
-        <model-viewer id="ar-viewer"
-                      src="data:model/gltf-binary;base64,Z2xURgIAAACoAAAAAAAAAAAAAABgTEFT////xwAAAAAAAAADAGpzb257ImFzc2V0Ijp7ImdlbmVyYXRvciI6IlVzaW5nIG1pbmltYWwgZ2xURiBTYXZlciIsIm1pblZlcnNpb24iOiIyLjAiLCJ2ZXJzaW9uIjoiMi4wIn0sImJ1ZmZlcnMiOlt7ImJ5dGVMZW5ndGgiOjE3Nn1dLCJidWZmZXJWaWV3cyI6W3siYnVmZmVyIjowLCJieXRlTGVuZ3RoIjo0OCwiYnl0ZU9mZnNldCI6MCwidGFyZ2V0IjozNDk2Mywib25seSI6ImluZGV4In0seyJidWZmZXIiOjAsImJ5dGVMZW5ndGgiOjEyOCwiYnl0ZU9mZnNldCI6NDgsInRhcmdldCI6MzQ5NjIsIm9ubHkiOiJ2ZXJ0ZXgifV0sImFjY2Vzc29ycyI6W3siYnVmZmVyVmlldyI6MCwiY29tcG9uZW50VHlwZSI6NTIzLCJjb3VudCI6MjQsInR5cGUiOiJTQ0FMQVIiLCJvbkx5IjoiaW5kZXgifSx7ImJ1ZmZlclZpZXciOjEsImNvbXBvbmVudFR5cGUiOjUzMjYsImNvdW50IjozMiwibWF4IjpbMC41LDAuNSwwLjVdLCJtaW4iOlswLDAsMF0sInR5cGUiOiJWRUMzIiwib25MeSI6InZlcnRleCJ9XSwibWVzaGVzIjpbeyJwcmltaXRpdmVzIjpbeyJpbmRpY2VzIjowLCJhdHRyaWJ1dGVzIjp7IlBPU0lUSU9OIjoxfX1dfV0sIm5vZGVzIjpbeyJtZXNoIjowfV0sIm5vZGVzIjpbeyJtZXNoIjowfV0sInNjZW5lcyI6W3sibm9kZXMiOlsxXX1dfQAAQkxBSwAAAABsAAAAAAAAAAAAAABQSU5YAAAAEgAAAAAAAAAAAAAAAFZFUlQAAABAAAAAEgAAAAAAAAABAAAABAAAAAcAAAALAAAAAQAAAAEAAAAAAAAAAQAAAAIAAAAAAAAAAQAAAAMAAAAAAAAAAQAAAAQAAAABAAAABQAAAAEAAAAGAAAAAQAAAAcAAAAAAAAAAQAAAAgAAAABAAAACQAAAAEAAAAKAAAAAQAAAAsAAAAAAAAAAQAAAAwAAAABAAAADQAAAAEAAAAOAAAAAQAAAP8AAAABAAAAAQAAAAIAAAADAAAABAAAAAUAAAAGAAAABwAAAAgAAAAJAAAACgAAAAsAAAAMAAAADQAAAA4AAAABAAAAAQAAAAMAAAADgAAAAEAAAACAAAAAQAAAAMAAAABAAAAAgAAAAUAAAAGAAAAAQAAAAYAAAAJAAAACgAAAAEAAAACAAAAAwAAAAEAAAADAAAADQAAAA4AAAADAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/"
-                      alt="A 3D model of a sphere"
-                      ar
-                      ar-placement="floor"
-                      camera-controls
-                      ar-modes="webxr scene-viewer quick-look">
-        </model-viewer>
-    </div>
-
-    <canvas id="canvas" style="display: none;"></canvas>
     <script>
-        // JavaScript 部分完全沒變，可以不用複製貼上，但為了完整性附上
-        const testCardScreen = document.getElementById('test-card-screen'); const cameraScreen = document.getElementById('camera-screen'); const arScreen = document.getElementById('ar-screen'); const startCameraButton = document.getElementById('start-camera-button'); const scanButton = document.getElementById('scan-button'); const video = document.getElementById('video'); const canvas = document.getElementById('canvas'); const statusDiv = document.getElementById('status'); const viewer = document.getElementById('ar-viewer'); const KEYWORD = "皮卡丘"; startCameraButton.addEventListener('click', async () => { testCardScreen.classList.add('hidden'); cameraScreen.classList.remove('hidden'); try { const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }); video.srcObject = stream; await video.play(); } catch (err) { console.error("相機錯誤:", err); alert("無法啟動相機，請檢查權限設定。"); testCardScreen.classList.remove('hidden'); cameraScreen.classList.add('hidden'); } }); scanButton.addEventListener('click', async () => { statusDiv.textContent = '辨識中，請稍候...'; scanButton.disabled = true; scanButton.style.backgroundColor = '#6c757d'; const context = canvas.getContext('2d'); canvas.width = video.videoWidth; canvas.height = video.videoHeight; context.drawImage(video, 0, 0, canvas.width, canvas.height); try { const { data: { text } } = await Tesseract.recognize(canvas, 'chi_tra', { logger: m => console.log(m) }); const cleanedText = text.replace(/\s/g, ''); console.log('辨識結果:', cleanedText); if (cleanedText.includes(KEYWORD)) { statusDiv.textContent = '辨識成功！正在啟動 AR...'; cameraScreen.classList.add('hidden'); arScreen.classList.remove('hidden'); try { await viewer.activateAR(); console.log("AR 已啟動"); } catch (error) { console.error("啟動 AR 失敗:", error); alert("AR 啟動失敗，您的裝置可能不支援。"); } } else { statusDiv.innerHTML = `辨識失敗！<br>偵測到文字: "${cleanedText}"<br>請重新對準「皮卡丘」再試一次。`; scanButton.disabled = false; scanButton.style.backgroundColor = 'var(--primary-color)'; } } catch (error) { console.error("OCR 處理時發生錯誤:", error); statusDiv.textContent = '辨識時發生錯誤，請重試。'; scanButton.disabled = false; scanButton.style.backgroundColor = 'var(--primary-color)'; } });
+        const uploader = document.getElementById('uploader');
+        const statusDiv = document.getElementById('status');
+        const imagePreview = document.getElementById('image-preview');
+        const resultBox = document.getElementById('result-box');
+        const resultText = document.getElementById('result-text');
+
+        const KEYWORD = "皮卡丘";
+
+        // 當使用者選擇檔案時觸發
+        uploader.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // 1. 顯示圖片預覽
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                imagePreview.src = e.target.result;
+                imagePreview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+
+            // 2. 重設狀態並開始辨識
+            resultBox.style.display = 'none';
+            resultText.textContent = '';
+            runOCR(file);
+        });
+
+        // 執行 OCR 的函式
+        async function runOCR(file) {
+            statusDiv.textContent = '初始化辨識引擎...';
+
+            // 3. 呼叫 Tesseract.js 進行辨識
+            //    使用 logger 來即時更新進度
+            const { data: { text } } = await Tesseract.recognize(
+                file,
+                'chi_tra', // 指定語言：繁體中文
+                {
+                    logger: m => {
+                        // 更新狀態，顯示辨識進度
+                        statusDiv.textContent = `${m.status}... (${Math.round(m.progress * 100)}%)`;
+                    }
+                }
+            );
+
+            // 4. 顯示完整辨識結果，方便除錯
+            resultText.textContent = text;
+            resultBox.style.display = 'block';
+
+            // 5. 檢查辨識結果是否包含關鍵字
+            if (text.includes(KEYWORD)) {
+                statusDiv.textContent = '✅ 偵測成功！';
+                statusDiv.style.color = 'green';
+            } else {
+                statusDiv.textContent = '❌ 未找到關鍵字';
+                statusDiv.style.color = 'red';
+            }
+        }
     </script>
 </body>
 </html>
