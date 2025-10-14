@@ -1,137 +1,224 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AR 食物掃描</title>
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@2.1.5/dist/tesseract.min.js"></script>
-  <style>
-    body {
-      font-family: "Noto Sans TC", sans-serif;
-      text-align: center;
-      background: #f8f8f8;
-      margin: 0;
-      padding: 0;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>進階 OCR -> Direct AR 測試</title>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --dark-color: #333;
+            --light-color: #fff;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f4f4f4;
+            overflow: hidden; /* 防止滾動 */
+        }
+        .screen {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.3s ease;
+        }
+        .hidden {
+            display: none !important;
+        }
+        
+        /* 測試卡片畫面 */
+        #test-card-screen {
+            background-color: #e9ecef;
+        }
+        #test-card {
+            background-color: var(--light-color);
+            padding: 40px 60px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            border: 1px solid #ddd;
+        }
+        #test-card h1 {
+            font-size: 60px;
+            font-weight: bold;
+            font-family: 'Heiti TC', 'Microsoft JhengHei', sans-serif; /* 標準黑體 */
+            color: var(--dark-color);
+            margin: 0;
+        }
+        #instructions {
+            margin-top: 30px;
+            font-size: 16px;
+            color: #666;
+            text-align: center;
+            max-width: 300px;
+        }
+        .main-button {
+            padding: 15px 30px;
+            font-size: 18px;
+            cursor: pointer;
+            border-radius: 50px;
+            border: none;
+            background-color: var(--primary-color);
+            color: white;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            margin-top: 20px;
+        }
 
-    #initial-screen, #video-container, #ar-viewer {
-      display: none;
-    }
-
-    #initial-screen.active,
-    #video-container.active,
-    #ar-viewer.active {
-      display: block;
-    }
-
-    video {
-      width: 90%;
-      border-radius: 12px;
-      margin-top: 10px;
-    }
-
-    #scan-button, #start-button {
-      background: #007aff;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      padding: 10px 20px;
-      font-size: 16px;
-      margin: 10px;
-      cursor: pointer;
-    }
-
-    #scan-button:disabled {
-      background: #ccc;
-    }
-
-    #status {
-      font-size: 14px;
-      color: #333;
-    }
-  </style>
+        /* 相機掃描畫面 */
+        #camera-screen video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            text-align: center;
+            width: 90%;
+        }
+        #status {
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        
+        /* AR Viewer */
+        model-viewer {
+            position: absolute; top:0; left:0;
+            width: 100%; height: 100%;
+        }
+    </style>
+    <script src='https://unpkg.com/tesseract.js@5/dist/tesseract.min.js'></script>
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
 </head>
-
 <body>
-  <div id="initial-screen" class="active">
-    <h1>啟動相機進行掃描</h1>
-    <button id="start-button">開始掃描</button>
-  </div>
 
-  <div id="video-container">
-    <video id="video" autoplay playsinline></video><br>
-    <button id="scan-button">掃描</button>
-    <p id="status">尚未開始</p>
-    <canvas id="canvas" style="display:none;"></canvas>
-  </div>
+    <div id="test-card-screen" class="screen">
+        <div id="test-card">
+            <h1>皮卡丘</h1>
+        </div>
+        <div id="instructions">
+            <p>請在另一台裝置 (手機/電腦) 打開此網頁，點擊下方按鈕以啟動相機，並掃描此卡片。</p>
+        </div>
+        <button id="start-camera-button" class="main-button">啟動相機進行掃描</button>
+    </div>
 
-  <div id="ar-viewer">
-    <h2>辨識成功！出現皮卡丘 🟡</h2>
-    <model-viewer src="https://modelviewer.dev/shared-assets/models/Astronaut.glb" 
-      auto-rotate camera-controls ar ar-modes="webxr scene-viewer quick-look" 
-      style="width: 100%; height: 400px;">
-    </model-viewer>
-  </div>
+    <div id="camera-screen" class="screen hidden">
+        <video id="video" playsinline></video>
+        <div id="controls">
+            <div id="status">請將相機對準測試卡上的「皮卡丘」</div>
+            <button id="scan-button" class="main-button">掃描</button>
+        </div>
+    </div>
+    
+    <div id="ar-screen" class="screen hidden">
+        <model-viewer id="ar-viewer"
+                      src="https://modelviewer.dev/shared-assets/models/Fox.glb" alt="A 3D model of a Fox"
+                      ar
+                      ar-placement="floor"
+                      camera-controls>
+        </model-viewer>
+    </div>
 
-  <script type="module">
-    import "@google/model-viewer";
+    <canvas id="canvas" style="display: none;"></canvas>
 
-    const initialScreen = document.getElementById('initial-screen');
-    const startButton = document.getElementById('start-button');
-    const videoContainer = document.getElementById('video-container');
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const scanButton = document.getElementById('scan-button');
-    const statusDiv = document.getElementById('status');
-    const viewer = document.getElementById('ar-viewer');
-    const KEYWORD = "皮卡丘";
+    <script>
+        // 取得所有畫面與元件
+        const testCardScreen = document.getElementById('test-card-screen');
+        const cameraScreen = document.getElementById('camera-screen');
+        const arScreen = document.getElementById('ar-screen');
+        
+        const startCameraButton = document.getElementById('start-camera-button');
+        const scanButton = document.getElementById('scan-button');
+        
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const statusDiv = document.getElementById('status');
+        const viewer = document.getElementById('ar-viewer');
 
-    // 啟動相機
-    startButton.addEventListener('click', async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        video.srcObject = stream;
-        await video.play();
-        initialScreen.classList.remove('active');
-        videoContainer.classList.add('active');
-      } catch (err) {
-        console.error("相機啟動失敗：", err);
-        alert("無法啟動相機，請確認權限設定。");
-      }
-    });
+        const KEYWORD = "皮卡丘";
 
-    // OCR 掃描
-    scanButton.addEventListener('click', async () => {
-      statusDiv.textContent = "辨識中...";
-      scanButton.disabled = true;
-
-      const context = canvas.getContext('2d');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      try {
-        const { data: { text } } = await Tesseract.recognize(canvas, 'chi_tra', {
-          logger: info => console.log(info)
+        // 點擊按鈕，從卡片畫面切換到相機畫面
+        startCameraButton.addEventListener('click', async () => {
+            testCardScreen.classList.add('hidden');
+            cameraScreen.classList.remove('hidden');
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                video.srcObject = stream;
+                await video.play();
+            } catch (err) {
+                console.error("相機錯誤:", err);
+                alert("無法啟動相機，請檢查權限設定。");
+                // 如果失敗，切換回卡片畫面
+                testCardScreen.classList.remove('hidden');
+                cameraScreen.classList.add('hidden');
+            }
         });
 
-        console.log("辨識結果：", text);
-        statusDiv.textContent = "辨識結果：" + text.trim();
+        // 點擊掃描按鈕，執行 OCR
+        scanButton.addEventListener('click', async () => {
+            statusDiv.textContent = '辨識中，請稍候...';
+            scanButton.disabled = true;
+            scanButton.style.backgroundColor = '#6c757d';
 
-        if (text.includes(KEYWORD)) {
-          statusDiv.textContent = "辨識成功！切換至 AR 模式";
-          videoContainer.classList.remove('active');
-          viewer.classList.add('active');
-        } else {
-          statusDiv.textContent = "辨識結果不符，請重試。";
-        }
-      } catch (err) {
-        console.error("辨識發生錯誤：", err);
-        alert("辨識發生錯誤：" + err.message);
-      } finally {
-        scanButton.disabled = false;
-      }
-    });
-  </script>
+            // 將當前影像繪製到 canvas
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // 使用 Tesseract.js 辨識 (繁體中文)
+            try {
+                const { data: { text } } = await Tesseract.recognize(
+                  canvas,
+                  'chi_tra',
+                  { logger: m => console.log(m) }
+                );
+
+                const cleanedText = text.replace(/\s/g, ''); // 去掉所有空白
+                console.log('辨識結果:', cleanedText);
+                
+                // 檢查是否包含關鍵字
+                if (cleanedText.includes(KEYWORD)) {
+                    statusDiv.textContent = '辨識成功！正在啟動 AR...';
+                    
+                    // 辨識成功，啟動 AR
+                    cameraScreen.classList.add('hidden');
+                    arScreen.classList.remove('hidden');
+                    
+                    try {
+                        await viewer.activateAR();
+                        console.log("AR 已啟動");
+                    } catch (error) {
+                        console.error("啟動 AR 失敗:", error);
+                        alert("AR 啟動失敗，您的裝置可能不支援。");
+                    }
+
+                } else {
+                    // 辨識失敗，顯示更詳細的資訊
+                    statusDiv.innerHTML = `辨識失敗！<br>偵測到文字: "${cleanedText}"<br>請重新對準「皮卡丘」再試一次。`;
+                    scanButton.disabled = false;
+                    scanButton.style.backgroundColor = 'var(--primary-color)';
+                }
+            } catch (error) {
+                console.error("OCR 處理時發生錯誤:", error);
+                statusDiv.textContent = '辨識時發生錯誤，請重試。';
+                scanButton.disabled = false;
+                scanButton.style.backgroundColor = 'var(--primary-color)';
+            }
+        });
+    </script>
 </body>
 </html>
