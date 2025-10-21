@@ -89,7 +89,7 @@
 
     <div class="container">
         <h1>Tesseract.js 關鍵字辨識</h1>
-        <p>請上傳一張圖片，或用手機拍照，系統將辨識是否包含關鍵字「皮卡丘」。</p>
+        <p>請上傳一張圖片，或用手機拍照，系統將辨識是否包含關鍵字「鹿角菜膠」。</p>
         
         <label for="uploader" class="upload-label">選擇檔案或拍照</label>
         <input type="file" id="uploader" accept="image/*">
@@ -105,7 +105,8 @@
         <div id="status">請選擇一張圖片</div>
 
         <img id="image-preview" alt="您上傳的圖片預覽">
-        <canvas id="preprocess-canvas"></canvas> <div id="result-box">
+        <canvas id="preprocess-canvas"></canvas> 
+        <div id="result-box">
             <h3>完整辨識文字:</h3>
             <pre id="result-text"></pre>
         </div>
@@ -117,9 +118,10 @@
         const imagePreview = document.getElementById('image-preview');
         const resultBox = document.getElementById('result-box');
         const resultText = document.getElementById('result-text');
-        const preprocessCanvas = document.getElementById('preprocess-canvas'); // 新增的 canvas 元素
+        const preprocessCanvas = document.getElementById('preprocess-canvas');
 
-        const KEYWORD = "皮卡丘";
+        // 【【【【【【 這裏是唯一的改動處 】】】】】】
+        const KEYWORD = "鹿角菜膠";
 
         uploader.addEventListener('change', (event) => {
             const file = event.target.files[0];
@@ -130,9 +132,8 @@
                 imagePreview.src = e.target.result;
                 imagePreview.style.display = 'block';
 
-                // 等待圖片完全載入到預覽區後再進行處理
                 imagePreview.onload = () => {
-                    runOCR(imagePreview); // 將圖片元素傳給 OCR 函式
+                    runOCR(imagePreview);
                 };
             };
             reader.readAsDataURL(file);
@@ -141,7 +142,6 @@
             resultText.textContent = '';
         });
 
-        // 圖片預處理：灰度化
         function toGrayscale(imgElement) {
             const context = preprocessCanvas.getContext('2d');
             preprocessCanvas.width = imgElement.naturalWidth;
@@ -157,45 +157,31 @@
                 data[i + 2] = avg; // blue
             }
             context.putImageData(imageData, 0, 0);
-            return preprocessCanvas; // 回傳處理後的 canvas 元素
+            return preprocessCanvas;
         }
 
-        async function runOCR(imageSource) { // 接收圖片元素作為來源
+        async function runOCR(imageSource) {
             statusDiv.textContent = '初始化辨識引擎...';
-
-            // 執行預處理：將圖片轉為灰度圖
             const processedImage = toGrayscale(imageSource);
             statusDiv.textContent = '圖片預處理完成 (灰度化)...';
 
-            // Tesseract 辨識選項
             const ocrOptions = {
-                lang: 'chi_tra', // 繁體中文
+                lang: 'chi_tra',
                 logger: m => {
                     statusDiv.textContent = `${m.status}... (${Math.round(m.progress * 100)}%)`;
                 },
-                // 調整 Tesseract 參數
-                // psm: Tesseract.PSM.SINGLE_BLOCK, // 頁面切割模式：視為單一文字塊
-                // oem: Tesseract.OEM.LSTM_ONLY, // OCR 引擎模式：LSTM 深度學習 (通常預設就很好)
             };
 
-            // 如果覺得偵測率還是低，可以嘗試不同的 PSM 模式
-            // psm: Tesseract.PSM.SINGLE_BLOCK 適用於偵測單一的大文字區塊
-            // psm: Tesseract.PSM.SINGLE_LINE (適用於確定只有一行文字的圖片)
-            // psm: Tesseract.PSM.SINGLE_WORD (適用於確定只有一個單字的圖片)
-            // 如果您的關鍵字是多個字，'SINGLE_BLOCK' 3 或 預設的 3 應該是比較好的選擇
-
             const { data: { text } } = await Tesseract.recognize(
-                processedImage, // 將處理後的圖片傳給 Tesseract
+                processedImage,
                 ocrOptions.lang,
                 {
                     logger: ocrOptions.logger,
-                    tessedit_pagesegmode: ocrOptions.psm, // 設定 PSM 參數
-                    // tessedit_ocr_engine_mode: ocrOptions.oem, // 設定 OEM 參數
                 }
             );
 
-            const cleanedText = text.replace(/\s/g, ''); // 去除所有空白字符，方便比對
-            resultText.textContent = text; // 顯示原始辨識文字 (含空白)
+            const cleanedText = text.replace(/\s/g, '');
+            resultText.textContent = text;
             resultBox.style.display = 'block';
 
             if (cleanedText.includes(KEYWORD)) {
